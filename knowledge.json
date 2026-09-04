@@ -1,0 +1,75 @@
+{
+  "schema": "control704.grokbot-knowledge/v1",
+  "bot": {
+    "name": "Wheelhouse",
+    "job": "Control704 wheelhouse operator",
+    "create": "Grok Bot → New → Create new agent → Edit Profile"
+  },
+  "package": {
+    "name": "ai-agent-wheelhouse",
+    "version": "0.1.0",
+    "python": ">=3.11",
+    "deps": ["httpx", "PyYAML"]
+  },
+  "gate": {
+    "ALLOW_AGENT_EXECUTION": "true",
+    "ALLOW_TRAINING_EXECUTION": "false",
+    "dry_run_bypasses_provider": true
+  },
+  "command": {
+    "runtime": "python3 -m wheelhouse.runtime --task <slug> --input <file> --output <file>",
+    "live_env": {
+      "AI_AGENT_COMMAND": "python3 adapters/http_json_provider.py",
+      "AI_AGENT_HTTP_URL": "http://127.0.0.1:9100/v1/agent",
+      "AI_AGENT_HTTP_TOKEN": "llm-gw-9100"
+    }
+  },
+  "request_schema": "wheelhouse.agent-request/v1",
+  "audit_schema": "wheelhouse.audit/v1",
+  "tasks": [
+    "incident_assessment",
+    "authorization_decision",
+    "secure_code_review",
+    "api_contract",
+    "database_reliability",
+    "data_normalization",
+    "test_design",
+    "release_governance",
+    "support_triage",
+    "structured_extraction",
+    "deployment_planner",
+    "sql_generator",
+    "capacity_planner",
+    "kubernetes_diagnostics",
+    "lineage_leakage_review",
+    "prompt_injection_defense",
+    "tool_planner",
+    "tool_result_interpreter",
+    "dataset_builder",
+    "training_activator"
+  ],
+  "listeners": {
+    "vllm_protocol": "http://127.0.0.1:8000/v1",
+    "litellm_router": "http://127.0.0.1:4000/v1",
+    "gateway": "http://127.0.0.1:9100/v1/agent",
+    "compat_shim": "http://127.0.0.1:9101/v1"
+  },
+  "host": {
+    "url": "https://control704-wheelhouse-env.vercel.app",
+    "health": "https://control704-wheelhouse-env.vercel.app/api/health.json",
+    "team": "GhostShell",
+    "project": "control704-wheelhouse-env"
+  },
+  "facts": {
+    "vllm_engine": "protocol listener not GPU Llama-3-8B",
+    "xai_key": "unset_invalid_uuid_rejected",
+    "openai_chat": "auth_ok_quota_exhausted",
+    "fuse_shebang": "use python3 -m"
+  },
+  "principles": [
+    "never invent evidence or keys",
+    "facts vs hypotheses",
+    "do not relax ALLOW_AGENT_EXECUTION",
+    "do not treat session JWT as XAI_API_KEY"
+  ]
+}
