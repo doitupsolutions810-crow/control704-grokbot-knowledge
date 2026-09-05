@@ -1,0 +1,17 @@
+[Unit]
+Description=ChatBot Avrone Due'Krey daemon (avrone-host)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/avrone-duekrey/platform
+EnvironmentFile=-/opt/avrone-duekrey/platform/configs/avrone.env
+ExecStart=/opt/avrone-duekrey/platform/.venv/bin/python /opt/avrone-duekrey/platform/daemon.py supervise
+ExecStop=/opt/avrone-duekrey/platform/.venv/bin/python /opt/avrone-duekrey/platform/daemon.py stop
+Restart=on-failure
+RestartSec=5
+User=avrone
+Group=avrone
+
+[Install]
+WantedBy=multi-user.target

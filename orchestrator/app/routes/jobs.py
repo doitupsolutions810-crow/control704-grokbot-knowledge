@@ -44,6 +44,17 @@ async def create_job(body: JobCreate) -> JobOut:
     return _job_out(detail)
 
 
+@router.get("", response_model=list[JobOut])
+def list_jobs(limit: int = Query(50, ge=1, le=200)) -> list[JobOut]:
+    jobs = db.list_jobs(limit=limit)
+    out = []
+    for job in jobs:
+        detail = orchestrator.get_job_detail(job.id)
+        if detail:
+            out.append(_job_out(detail))
+    return out
+
+
 @router.get("/{job_id}", response_model=JobOut)
 def get_job(job_id: str) -> JobOut:
     detail = orchestrator.get_job_detail(job_id)
@@ -96,6 +107,7 @@ async def spawn_agent(job_id: str, body: SpawnRequest) -> SpawnResult:
             role=body.role,
             goal=body.goal,
             parent_agent_id=body.parent_agent_id,
+            tools=body.tools,
         )
     except ValueError as exc:
         msg = str(exc)
@@ -108,6 +120,8 @@ async def spawn_agent(job_id: str, body: SpawnRequest) -> SpawnResult:
         gated=result["gated"],
         activation_intent=result.get("activation_intent"),
         message=result["message"],
+        job_id=job_id,
+        tools=result.get("tools") or body.tools,
     )
 
 

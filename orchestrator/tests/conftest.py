@@ -1,4 +1,4 @@
-"""Pytest fixtures for GrokBot Orchestrator."""
+"""Pytest fixtures for ChatBot Avrone Due'Krey Orchestrator."""
 
 from __future__ import annotations
 
@@ -11,9 +11,14 @@ from fastapi.testclient import TestClient
 # Ensure test env before app imports settings
 os.environ["ALLOW_AGENT_EXECUTION"] = "false"
 os.environ["MAX_AGENT_DEPTH"] = "3"
-os.environ["SOURCE_DEFAULT"] = "grokbot-orchestrator"
+os.environ["SOURCE_DEFAULT"] = "avrone-duekrey"
+os.environ["LLM_BASE_URL"] = "http://127.0.0.1:4000/v1"
+os.environ["LLM_MODEL"] = "mock-gpt"
 
-TEST_DB = Path(__file__).resolve().parent.parent / "data" / "test_grokbot.db"
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+os.environ["KNOWLEDGE_ROOT"] = str(REPO_ROOT)
+
+TEST_DB = Path(__file__).resolve().parent.parent / "data" / "test_avrone.db"
 os.environ["DATABASE_URL"] = f"sqlite:///{TEST_DB}"
 
 
@@ -24,7 +29,9 @@ def fresh_db(tmp_path, monkeypatch):
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_file}")
     monkeypatch.setenv("ALLOW_AGENT_EXECUTION", "false")
     monkeypatch.setenv("MAX_AGENT_DEPTH", "3")
-    monkeypatch.setenv("SOURCE_DEFAULT", "grokbot-orchestrator")
+    monkeypatch.setenv("SOURCE_DEFAULT", "avrone-duekrey")
+    monkeypatch.setenv("KNOWLEDGE_ROOT", str(REPO_ROOT))
+    monkeypatch.setenv("ARTIFACTS_DIR", str(tmp_path / "artifacts"))
 
     from app.config import get_settings
     from app.llm import reset_llm_provider, set_llm_provider, MockLLMProvider

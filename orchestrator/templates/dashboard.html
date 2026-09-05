@@ -3,94 +3,407 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>GrokBot Orchestrator</title>
+  <title>ChatBot Avrone Due'Krey</title>
   <style>
     :root {
-      --bg: #0f1419;
-      --panel: #1a2332;
-      --border: #2d3a4f;
-      --text: #e7ecf3;
-      --muted: #8b9bb4;
-      --accent: #3b82f6;
-      --ok: #22c55e;
-      --warn: #f59e0b;
-      --bad: #ef4444;
+      --bg: #070b12;
+      --panel: #0e1624;
+      --panel2: #121c2e;
+      --border: #1e2d45;
+      --text: #e8eef8;
+      --muted: #8091ad;
+      --accent: #38bdf8;
+      --accent2: #a78bfa;
+      --ok: #34d399;
+      --warn: #fbbf24;
+      --bad: #f87171;
+      --glow: rgba(56, 189, 248, 0.15);
     }
     * { box-sizing: border-box; }
     body {
-      margin: 0; font-family: ui-sans-serif, system-ui, sans-serif;
-      background: var(--bg); color: var(--text); line-height: 1.5;
+      margin: 0; font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+      background:
+        radial-gradient(1200px 600px at 10% -10%, #132038 0%, transparent 55%),
+        radial-gradient(900px 500px at 100% 0%, #1a1230 0%, transparent 50%),
+        var(--bg);
+      color: var(--text); line-height: 1.45; min-height: 100vh;
     }
     header {
-      padding: 1.25rem 2rem; border-bottom: 1px solid var(--border);
-      display: flex; align-items: center; justify-content: space-between;
-      background: var(--panel);
+      padding: 0.9rem 1.25rem; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+      background: rgba(14,22,36,0.92); backdrop-filter: blur(8px);
+      position: sticky; top: 0; z-index: 20;
     }
-    h1 { margin: 0; font-size: 1.25rem; letter-spacing: 0.02em; }
-    .meta { color: var(--muted); font-size: 0.875rem; }
-    main { padding: 1.5rem 2rem; max-width: 1100px; margin: 0 auto; }
+    .brand { display: flex; align-items: center; gap: 0.75rem; }
+    .mark {
+      width: 34px; height: 34px; border-radius: 8px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      box-shadow: 0 0 24px var(--glow); display:grid; place-items:center;
+      font-weight: 800; color: #041018; font-size: 0.85rem;
+    }
+    h1 { margin: 0; font-size: 1.05rem; letter-spacing: 0.04em; font-weight: 700; }
+    .sub { color: var(--muted); font-size: 0.75rem; }
+    .meta { color: var(--muted); font-size: 0.8rem; text-align: right; }
+    .layout {
+      display: grid;
+      grid-template-columns: 280px 1fr 320px;
+      gap: 0.85rem; padding: 0.85rem; max-width: 1600px; margin: 0 auto;
+    }
+    @media (max-width: 1100px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+    .col { display: flex; flex-direction: column; gap: 0.85rem; min-width: 0; }
     .card {
-      background: var(--panel); border: 1px solid var(--border);
-      border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 1rem;
+      background: linear-gradient(180deg, var(--panel2), var(--panel));
+      border: 1px solid var(--border); border-radius: 12px;
+      padding: 0.9rem 1rem; box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
     }
-    .job-title { font-weight: 600; margin-bottom: 0.35rem; }
+    .card h2 {
+      margin: 0 0 0.65rem; font-size: 0.72rem; text-transform: uppercase;
+      letter-spacing: 0.12em; color: var(--muted); font-weight: 650;
+    }
+    .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+    .tile {
+      border: 1px solid var(--border); border-radius: 10px; padding: 0.55rem 0.65rem;
+      background: #0a1220;
+    }
+    .tile .name { font-size: 0.72rem; color: var(--muted); }
+    .tile .val { font-size: 0.92rem; font-weight: 650; margin-top: 0.15rem; }
+    .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; background: var(--muted); }
+    .dot.ok { background: var(--ok); box-shadow: 0 0 8px rgba(52,211,153,0.5); }
+    .dot.bad { background: var(--bad); }
     .badge {
-      display: inline-block; padding: 0.15rem 0.5rem; border-radius: 999px;
-      font-size: 0.75rem; font-weight: 600; background: #243044; color: var(--muted);
+      display: inline-block; padding: 0.12rem 0.45rem; border-radius: 999px;
+      font-size: 0.7rem; font-weight: 650; background: #1a273c; color: var(--muted);
     }
-    .badge.running, .badge.activating { color: var(--accent); background: #1e3a5f; }
-    .badge.gated { color: var(--warn); background: #3d2e12; }
-    .badge.completed { color: var(--ok); background: #14301f; }
-    .badge.cancelled, .badge.failed { color: var(--bad); background: #3b1515; }
-    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; margin-top: 0.75rem; }
-    th, td { text-align: left; padding: 0.4rem 0.5rem; border-top: 1px solid var(--border); }
-    th { color: var(--muted); font-weight: 500; }
-    .empty { color: var(--muted); padding: 2rem; text-align: center; }
-    code { font-size: 0.8rem; color: #93c5fd; }
+    .badge.running, .badge.activating, .badge.queued { color: var(--accent); background: #12324a; }
+    .badge.gated { color: var(--warn); background: #3a2c10; }
+    .badge.completed { color: var(--ok); background: #10301f; }
+    .badge.cancelled, .badge.failed { color: var(--bad); background: #3a1518; }
+    .chat-log {
+      height: 320px; overflow: auto; border: 1px solid var(--border);
+      border-radius: 10px; padding: 0.75rem; background: #080e18; font-size: 0.88rem;
+    }
+    .msg { margin-bottom: 0.65rem; }
+    .msg .who { font-size: 0.7rem; color: var(--muted); margin-bottom: 0.15rem; }
+    .msg.user .bubble { background: #15263d; }
+    .msg.bot .bubble { background: #1a1530; border: 1px solid #2a2150; }
+    .bubble { padding: 0.55rem 0.7rem; border-radius: 10px; white-space: pre-wrap; }
+    .row { display: flex; gap: 0.5rem; margin-top: 0.65rem; }
+    input, select, textarea, button {
+      font: inherit; color: var(--text); background: #0a1220;
+      border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.65rem;
+    }
+    input, select, textarea { width: 100%; }
+    textarea { min-height: 70px; resize: vertical; }
+    button {
+      background: linear-gradient(135deg, #0ea5e9, #6366f1); border: none;
+      font-weight: 700; cursor: pointer; white-space: nowrap;
+    }
+    button.secondary { background: #152033; border: 1px solid var(--border); font-weight: 600; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .jobs { max-height: 420px; overflow: auto; }
+    .job {
+      border-top: 1px solid var(--border); padding: 0.55rem 0; cursor: pointer;
+    }
+    .job:hover { background: rgba(56,189,248,0.05); }
+    .job.active { background: rgba(56,189,248,0.08); }
+    .job-title { font-size: 0.82rem; font-weight: 600; }
+    .tree { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.78rem; }
+    .tree .node { padding: 0.25rem 0; border-left: 2px solid var(--border); margin-left: 0.4rem; padding-left: 0.55rem; }
+    .form-grid { display: grid; gap: 0.45rem; }
+    .form-grid label { font-size: 0.72rem; color: var(--muted); }
+    .art-list { list-style: none; padding: 0; margin: 0; max-height: 180px; overflow: auto; }
+    .art-list li { display:flex; justify-content:space-between; gap:0.5rem; padding: 0.3rem 0; border-bottom: 1px solid var(--border); font-size: 0.8rem; }
+    a { color: var(--accent); text-decoration: none; }
+    code { color: #93c5fd; font-size: 0.78rem; }
+    .pillrow { display:flex; flex-wrap:wrap; gap:0.35rem; margin-top:0.4rem; }
   </style>
 </head>
 <body>
   <header>
-    <h1>GrokBot Orchestrator</h1>
+    <div class="brand">
+      <div class="mark">AD</div>
+      <div>
+        <h1>ChatBot Avrone Due'Krey</h1>
+        <div class="sub">Sub-Agent Orchestration · Spawn-Agent for Tasks · avrone-host</div>
+      </div>
+    </div>
     <div class="meta">
-      ALLOW_AGENT_EXECUTION=<strong>{{ "true" if allow_exec else "false" }}</strong>
-      · MAX_AGENT_DEPTH={{ max_depth }}
+      EXEC=<strong>{{ "true" if allow_exec else "false" }}</strong>
+      · DEPTH={{ max_depth }}
+      · LLM=<code>{{ llm_model }}</code><br/>
+      <span id="baseUrl">{{ public_base_url }}</span>
     </div>
   </header>
-  <main>
-    <p class="meta">Jobs and agent trees. Refresh to update. API at <code>/jobs</code>, <code>/health</code>.</p>
-    {% if not job_rows %}
-      <div class="card empty">No jobs yet. POST /jobs to create one.</div>
-    {% endif %}
-    {% for row in job_rows %}
+
+  <div class="layout">
+    <!-- LEFT -->
+    <div class="col">
       <div class="card">
-        <div class="job-title">
-          <code>{{ row.job.id }}</code>
-          <span class="badge {{ row.job.status }}">{{ row.job.status }}</span>
-          · {{ row.agent_count }} agent{{ "" if row.agent_count == 1 else "s" }}
+        <h2>Service status</h2>
+        <div class="tiles" id="serviceTiles">
+          {% for name, port in ports.items() %}
+          <div class="tile" data-svc="{{ name }}">
+            <div class="name">{{ name }} :{{ port }}</div>
+            <div class="val"><span class="dot" id="dot-{{ name }}"></span><span id="lbl-{{ name }}">…</span></div>
+          </div>
+          {% endfor %}
         </div>
-        <div>{{ row.job.goal }}</div>
-        <div class="meta">source={{ row.job.source }} · priority={{ row.job.priority }} · {{ row.job.created_at }}</div>
-        {% if row.agents %}
-        <table>
-          <thead>
-            <tr><th>Agent</th><th>Role</th><th>Depth</th><th>Status</th><th>Goal</th></tr>
-          </thead>
-          <tbody>
-            {% for a in row.agents %}
-            <tr>
-              <td><code>{{ a.id }}</code></td>
-              <td>{{ a.role }}</td>
-              <td>{{ a.depth }}</td>
-              <td><span class="badge {{ a.status }}">{{ a.status }}</span></td>
-              <td>{{ a.goal[:80] }}{% if a.goal|length > 80 %}…{% endif %}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-        {% endif %}
       </div>
-    {% endfor %}
-  </main>
+
+      <div class="card">
+        <h2>Jobs</h2>
+        <div class="jobs" id="jobList">
+          {% if not job_rows %}
+            <div class="sub">No jobs yet.</div>
+          {% endif %}
+          {% for row in job_rows %}
+          <div class="job" data-id="{{ row.job.id }}" onclick="selectJob('{{ row.job.id }}')">
+            <div class="job-title"><code>{{ row.job.id }}</code>
+              <span class="badge {{ row.job.status }}">{{ row.job.status }}</span>
+            </div>
+            <div class="sub">{{ row.job.goal[:90] }}{% if row.job.goal|length > 90 %}…{% endif %}</div>
+            <div class="sub">{{ row.agent_count }} agents · {{ row.job.source }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Artifacts</h2>
+        <ul class="art-list" id="artList">
+          {% for a in artifacts %}
+          <li><a href="/artifacts/{{ a.name }}" target="_blank">{{ a.name }}</a><span class="sub">{{ a.bytes }} B</span></li>
+          {% else %}
+          <li class="sub">No artifacts</li>
+          {% endfor %}
+        </ul>
+        <div class="row">
+          <input type="file" id="artFile" />
+          <button class="secondary" type="button" onclick="uploadArt()">Upload</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CENTER -->
+    <div class="col">
+      <div class="card">
+        <h2>Chat · Avrone Due'Krey</h2>
+        <div class="chat-log" id="chatLog"></div>
+        <div class="row">
+          <input id="chatInput" placeholder="Ask the ops console…" onkeydown="if(event.key==='Enter')sendChat()" />
+          <button type="button" onclick="sendChat()">Send</button>
+          <button class="secondary" type="button" onclick="sendChatStream()">Stream</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Agent tree</h2>
+        <div id="agentTree" class="tree sub">Select a job to inspect Sub-Agent Orchestration.</div>
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="col">
+      <div class="card">
+        <h2>Spawn-Agent for Tasks</h2>
+        <div class="form-grid">
+          <label>Role</label>
+          <select id="spawnRole">
+            <option value="researcher">researcher</option>
+            <option value="coder">coder</option>
+            <option value="verifier">verifier</option>
+            <option value="orchestrator">orchestrator</option>
+          </select>
+          <label>Goal</label>
+          <textarea id="spawnGoal" placeholder="Task goal for the spawned agent"></textarea>
+          <label>Tools (comma-separated)</label>
+          <input id="spawnTools" placeholder="knowledge_read,artifact_write,http_fetch" />
+          <label>Job ID (optional — creates job if empty)</label>
+          <input id="spawnJobId" placeholder="job_…" />
+          <button type="button" onclick="spawnAgent()">Spawn Agent</button>
+        </div>
+        <pre id="spawnOut" class="sub" style="white-space:pre-wrap;margin-top:0.6rem;"></pre>
+      </div>
+
+      <div class="card">
+        <h2>Quick create job</h2>
+        <div class="form-grid">
+          <textarea id="jobGoal" placeholder="Hard task goal"></textarea>
+          <button type="button" onclick="createJob()">Create Job</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Config</h2>
+        <div class="form-grid">
+          <label>CUSTOM_URL / public base</label>
+          <input id="customUrl" value="{{ public_base_url }}" />
+          <button class="secondary" type="button" onclick="saveConfig()">Save config</button>
+        </div>
+        <div class="pillrow" id="flags">
+          {% for k,v in features.items() %}
+          <span class="badge {{ 'completed' if v else 'cancelled' }}">{{ k }}={{ v }}</span>
+          {% endfor %}
+        </div>
+        <div class="sub" style="margin-top:0.5rem">API docs: <a href="/docs">/docs</a> · Knowledge: <a href="/knowledge">/knowledge</a></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let selectedJob = null;
+    const chatHistory = [];
+
+    function appendChat(who, text) {
+      const log = document.getElementById('chatLog');
+      const div = document.createElement('div');
+      div.className = 'msg ' + (who === 'you' ? 'user' : 'bot');
+      div.innerHTML = `<div class="who">${who}</div><div class="bubble"></div>`;
+      div.querySelector('.bubble').textContent = text;
+      log.appendChild(div);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    async function sendChat() {
+      const input = document.getElementById('chatInput');
+      const msg = input.value.trim();
+      if (!msg) return;
+      input.value = '';
+      appendChat('you', msg);
+      chatHistory.push({role:'user', content: msg});
+      const r = await fetch('/chat', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({message: msg, history: chatHistory.slice(0,-1), job_id: selectedJob})
+      });
+      const data = await r.json();
+      const reply = data.reply || data.detail || JSON.stringify(data);
+      appendChat("Avrone Due'Krey", reply);
+      chatHistory.push({role:'assistant', content: reply});
+    }
+
+    async function sendChatStream() {
+      const input = document.getElementById('chatInput');
+      const msg = input.value.trim();
+      if (!msg) return;
+      input.value = '';
+      appendChat('you', msg);
+      appendChat("Avrone Due'Krey", '');
+      const bubble = document.querySelector('#chatLog .msg.bot:last-child .bubble');
+      const r = await fetch('/chat/stream', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({message: msg, history: chatHistory, stream: true})
+      });
+      const reader = r.body.getReader();
+      const dec = new TextDecoder();
+      let acc = '';
+      while (true) {
+        const {done, value} = await reader.read();
+        if (done) break;
+        const chunk = dec.decode(value);
+        for (const line of chunk.split('\n')) {
+          if (!line.startsWith('data:')) continue;
+          try {
+            const ev = JSON.parse(line.slice(5).trim());
+            if (ev.type === 'token') { acc += ev.content; bubble.textContent = acc; }
+          } catch {}
+        }
+      }
+      chatHistory.push({role:'user', content: msg});
+      chatHistory.push({role:'assistant', content: acc});
+    }
+
+    async function spawnAgent() {
+      const role = document.getElementById('spawnRole').value;
+      const goal = document.getElementById('spawnGoal').value.trim();
+      const tools = document.getElementById('spawnTools').value.split(',').map(s=>s.trim()).filter(Boolean);
+      const job_id = document.getElementById('spawnJobId').value.trim() || null;
+      if (!goal) return;
+      const r = await fetch('/spawn-agent', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({role, goal, tools, job_id})
+      });
+      const data = await r.json();
+      document.getElementById('spawnOut').textContent = JSON.stringify(data, null, 2);
+      if (data.job_id) { selectedJob = data.job_id; await selectJob(data.job_id); }
+      setTimeout(() => location.reload(), 800);
+    }
+
+    async function createJob() {
+      const goal = document.getElementById('jobGoal').value.trim();
+      if (!goal) return;
+      const r = await fetch('/jobs', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({goal})
+      });
+      if (r.ok) location.reload();
+      else alert(await r.text());
+    }
+
+    async function selectJob(id) {
+      selectedJob = id;
+      document.querySelectorAll('.job').forEach(el => el.classList.toggle('active', el.dataset.id === id));
+      document.getElementById('spawnJobId').value = id;
+      const r = await fetch('/jobs/' + id);
+      const data = await r.json();
+      const tree = data.agent_tree;
+      document.getElementById('agentTree').innerHTML = tree ? renderTree(tree, 0) : 'No tree';
+    }
+
+    function renderTree(node, depth) {
+      const pad = '&nbsp;'.repeat(depth * 2);
+      let html = `<div class="node">${pad}<strong>${node.role}</strong> <span class="badge ${node.status}">${node.status}</span> <code>${node.id}</code><br/>${pad}<span class="sub">${escapeHtml(node.goal || '').slice(0,120)}</span></div>`;
+      (node.children || []).forEach(c => { html += renderTree(c, depth + 1); });
+      return html;
+    }
+
+    function escapeHtml(s) {
+      return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    async function uploadArt() {
+      const f = document.getElementById('artFile').files[0];
+      if (!f) return;
+      const fd = new FormData(); fd.append('file', f);
+      const r = await fetch('/artifacts/upload', {method:'POST', body: fd});
+      if (r.ok) location.reload(); else alert(await r.text());
+    }
+
+    async function saveConfig() {
+      const custom_url = document.getElementById('customUrl').value.trim();
+      const r = await fetch('/config', {
+        method:'PUT', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({custom_url})
+      });
+      const data = await r.json();
+      document.getElementById('baseUrl').textContent = data.public_base_url || custom_url;
+      alert('Config saved');
+    }
+
+    async function refreshServices() {
+      try {
+        const r = await fetch('/services');
+        const data = await r.json();
+        const svcs = data.services || {};
+        for (const [name, info] of Object.entries(svcs)) {
+          const dot = document.getElementById('dot-' + name);
+          const lbl = document.getElementById('lbl-' + name);
+          if (!dot || !lbl) continue;
+          if (info.ok) { dot.className = 'dot ok'; lbl.textContent = 'up'; }
+          else { dot.className = 'dot bad'; lbl.textContent = 'down'; }
+        }
+      } catch {
+        ['orchestrator','litellm','vllm','artifacts','compat'].forEach(n => {
+          const d = document.getElementById('dot-' + n);
+          if (d) d.className = 'dot bad';
+        });
+      }
+    }
+
+    appendChat("Avrone Due'Krey", "HUD online. Gated execution default is off — spawn agents or chat to operate.");
+    refreshServices();
+    setInterval(refreshServices, 8000);
+  </script>
 </body>
 </html>

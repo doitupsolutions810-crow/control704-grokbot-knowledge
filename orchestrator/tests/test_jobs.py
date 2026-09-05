@@ -11,6 +11,7 @@ def test_health(client):
     assert data["allow_agent_execution"] is False
     assert data["max_agent_depth"] == 3
     assert "version" in data
+    assert "Avrone" in data.get("product", "")
 
 
 def test_create_job(client):
@@ -22,14 +23,13 @@ def test_create_job(client):
     data = r.json()
     assert data["goal"] == "Ship multi-agent orchestrator"
     assert data["status"] == "running"
-    assert data["source"] == "grokbot-orchestrator"
+    assert data["source"] == "avrone-duekrey"
     assert data["priority"] == 1
     assert data["root_agent_id"]
     assert len(data["agents"]) >= 1
     root = data["agents"][0]
     assert root["role"] == "orchestrator"
     assert root["depth"] == 0
-    # Gated by default
     assert root["status"] == "gated"
     assert data["agent_tree"] is not None
     assert data["agent_tree"]["role"] == "orchestrator"
@@ -116,8 +116,9 @@ def test_dashboard(client):
     r = client.get("/")
     assert r.status_code == 200
     assert "text/html" in r.headers["content-type"]
-    assert b"GrokBot Orchestrator" in r.content
+    assert b"ChatBot Avrone Due" in r.content
     assert b"Dashboard job" in r.content
+    assert b"Spawn-Agent" in r.content
 
 
 def test_execution_enabled_completes_agent(client, exec_enabled):
