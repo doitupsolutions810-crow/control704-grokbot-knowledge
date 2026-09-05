@@ -1,8 +1,15 @@
-# LiteLLM proxy config for ChatBot Avrone Due'Krey
-# Docs: https://docs.litellm.ai/docs/proxy/configs
-
 model_list:
-  - model_name: mock-gpt
+  - model_name: gpt-4o-mini
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+
+  - model_name: gpt-4o
+    litellm_params:
+      model: openai/gpt-4o
+      api_key: os.environ/OPENAI_API_KEY
+
+  - model_name: vllm-custom
     litellm_params:
       model: openai/gpt-4o-mini
       api_key: os.environ/OPENAI_API_KEY
@@ -10,11 +17,10 @@ model_list:
 
   - model_name: avrone-local
     litellm_params:
-      model: openai/avrone-local
-      api_base: http://127.0.0.1:8000/v1
-      api_key: sk-avrone
+      model: openai/gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
 
-  - model_name: gpt-4o-mini
+  - model_name: mock-gpt
     litellm_params:
       model: openai/gpt-4o-mini
       api_key: os.environ/OPENAI_API_KEY

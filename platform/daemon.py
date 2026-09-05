@@ -32,7 +32,8 @@ def load_env_file(path: Path) -> None:
         if not line or line.startswith("#") or "=" not in line:
             continue
         k, v = line.split("=", 1)
-        os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+        # File values win so avrone.env updates apply on restart
+        os.environ[k.strip()] = v.strip().strip('"').strip("'")
 
 
 def port_free(port: int, host: str = "127.0.0.1") -> bool:
@@ -74,8 +75,9 @@ class Daemon:
         if env_file:
             load_env_file(env_file)
         else:
-            load_env_file(PLATFORM / "configs" / "avrone.env")
+            # Orchestrator .env first; platform avrone.env wins for host flags
             load_env_file(ORCH / ".env")
+            load_env_file(PLATFORM / "configs" / "avrone.env")
 
         saved = self._load_ports() if reuse_ports else None
         reserved: set[int] = set()
@@ -129,7 +131,20 @@ class Daemon:
         artifacts_dir.mkdir(parents=True, exist_ok=True)
 
         use_real_litellm = os.environ.get("AVRONE_USE_LITELLM", "0") in ("1", "true", "TRUE")
-        if use_real_litellm and litellm_bin.is_file():
+        has_provider_key = bool(os.environ.get("OPENAI_API_KEY") or os.environ.get("XAI_API_KEY"))
+        # Prefer direct OpenAI-compatible proxy (vLLM custom API) when a provider key is set.
+        # Full LiteLLM CLI proxy often requires Prisma/Postgres; keep as optional override.
+        use_litellm_cli = os.environ.get("AVRONE_LITELLM_CLI", "0") in ("1", "true", "TRUE")
+        if use_real_litellm and has_provider_key and not use_litellm_cli:
+            litellm_cmd = [
+                py,
+                str(PLATFORM / "openai_proxy.py"),
+                "--host",
+                "0.0.0.0",
+                "--port",
+                str(self.ports["litellm"]),
+            ]
+        elif use_real_litellm and use_litellm_cli and litellm_bin.is_file():
             litellm_cmd = [
                 str(litellm_bin),
                 "--config",
@@ -140,7 +155,6 @@ class Daemon:
                 str(self.ports["litellm"]),
             ]
         else:
-            # Default: reliable mock OpenAI-compatible proxy (set AVRONE_USE_LITELLM=1 for real)
             litellm_cmd = [
                 py,
                 str(PLATFORM / "mock_litellm.py"),
@@ -273,6 +287,10 @@ class Daemon:
         logf = self._log_path(svc.name).open("a", buffering=1)
         env = os.environ.copy()
         env.update(svc.env)
+        if svc.name == "litellm":
+            # LiteLLM proxy DB features need Postgres; avoid sqlite DATABASE_URL
+            env.pop("DATABASE_URL", None)
+            env.setdefault("STORE_MODEL_IN_DB", "False")
         try:
             proc = subprocess.Popen(
                 svc.cmd,
@@ -300,14 +318,14 @@ class Daemon:
         self._pid_path(svc.name).write_text(str(proc.pid))
         svc.pid = proc.pid
         # Health probe for litellm — fall back to mock if still down
-        if svc.name == "litellm" and not self._wait_health(svc.port, timeout=4.0):
+        if svc.name == "litellm" and not self._wait_health(svc.port, timeout=12.0):
             print(f"[avrone] litellm not healthy on :{svc.port} — switching to mock")
             self.stop_service(svc.name)
             return self._start_fallback(svc, logf)
         print(f"[avrone] started {svc.name} pid={proc.pid} port={svc.port}")
         return True
 
-    def _wait_health(self, port: int, timeout: float = 4.0) -> bool:
+    def _wait_health(self, port: int, timeout: float = 12.0) -> bool:
         import urllib.request
         deadline = time.time() + timeout
         url = f"http://127.0.0.1:{port}/health"
