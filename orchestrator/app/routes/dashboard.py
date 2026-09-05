@@ -1,4 +1,4 @@
-"""Minimal HTML dashboard."""
+"""ChatBot Avrone Due'Krey HUD dashboard."""
 
 from __future__ import annotations
 
@@ -25,6 +25,12 @@ def dashboard(request: Request) -> HTMLResponse:
     for job in jobs:
         agents = db.list_agents_for_job(job.id)
         job_rows.append({"job": job, "agents": agents, "agent_count": len(agents)})
+    artifacts_dir = settings.resolved_artifacts_dir()
+    artifacts = []
+    if artifacts_dir.is_dir():
+        for p in sorted(artifacts_dir.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True)[:30]:
+            if p.is_file() and not p.name.startswith("."):
+                artifacts.append({"name": p.name, "bytes": p.stat().st_size})
     return templates.TemplateResponse(
         request,
         "dashboard.html",
@@ -32,5 +38,18 @@ def dashboard(request: Request) -> HTMLResponse:
             "job_rows": job_rows,
             "allow_exec": settings.allow_agent_execution,
             "max_depth": settings.max_agent_depth,
+            "product": "ChatBot Avrone Due'Krey",
+            "public_base_url": settings.public_base_url(),
+            "llm_base_url": settings.llm_base_url,
+            "llm_model": settings.llm_model,
+            "artifacts": artifacts,
+            "ports": {
+                "vllm": settings.vllm_port,
+                "litellm": settings.litellm_port,
+                "orchestrator": settings.orchestrator_port,
+                "compat": settings.compat_port,
+                "artifacts": settings.artifact_port,
+            },
+            "features": settings.feature_flags(),
         },
     )

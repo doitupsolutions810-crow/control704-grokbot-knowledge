@@ -1,147 +1,97 @@
-# GrokBot Orchestrator
+# ChatBot Avrone Due'Krey — Orchestrator
 
-FastAPI + SQLite AI orchestration control plane. Operators create hard-task jobs, append mid-flight, and spawn sub-agents under a gated multi-agent execution model.
+FastAPI + SQLite control plane for **Sub-Agent Orchestration** and **Spawn-Agent for Tasks**. Part of the `avrone-host` / `avrone-duekrey-daemon` platform.
+
+Default listen port in the full stack: **9100** (standalone quickstart may still use uvicorn defaults).
 
 ## Architecture
 
 ```mermaid
 flowchart TB
-  subgraph ControlPlane["GrokBot Control Plane"]
-    API["FastAPI routes\n/jobs /health /"]
-    Orch["Orchestrator\ncreate · append · spawn · cancel"]
-    Gate{"ALLOW_AGENT_EXECUTION?"}
-    LLM["LLM Provider\nOpenAI-compatible / MockLLM"]
-    DB[(SQLite\njobs · agents · events)]
-  end
+  HUD["HUD /\nChatBot Avrone Due'Krey"]
+  API["FastAPI\n/jobs /chat /spawn-agent /knowledge /builds /config /artifacts"]
+  Orch["Orchestrator"]
+  Tools["Tool registry\nshell · http_fetch · knowledge_read · artifact_write · spawn_child"]
+  Gate{"ALLOW_AGENT_EXECUTION?"}
+  LLM["LiteLLM :4000\n← vLLM shim :8000"]
+  DB[(SQLite)]
+  Art[(artifacts/)]
 
-  Op[Operator] --> API
+  HUD --> API
   API --> Orch
+  Orch --> Tools
   Orch --> DB
   Orch --> Gate
-  Gate -->|false| Dry["Gated dry-run\nactivation_intent + events"]
+  Gate -->|false| Dry[Gated dry-run]
   Gate -->|true| LLM
-  LLM --> DB
-
-  subgraph Tree["Job agent tree"]
-    Root["Root orchestrator\ndepth 0"]
-    R["researcher"]
-    C["coder"]
-    V["verifier"]
-    Root --> R
-    Root --> C
-    Root --> V
-  end
-
-  Orch --> Tree
+  Tools --> Art
 ```
 
-When `ALLOW_AGENT_EXECUTION=false` (default), activations still create agent records and events but return a **dry-run activation intent** (`status=gated`). When `true`, the pluggable LLM provider runs.
-
-## Layout
-
-```
-grokbot-orchestrator/
-  app/           # FastAPI app, orchestrator, LLM, routes
-  templates/     # HTML dashboard
-  tests/         # pytest suite
-  data/          # SQLite files
-```
-
-## Quickstart
+## Quickstart (orchestrator only)
 
 ```bash
 cd orchestrator
-python3.11 -m venv .venv
-source .venv/bin/activate
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-
-# optional: copy env
 cp .env.example .env
-
-# tests
 pytest -q
-
-# run server
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn app.main:app --host 0.0.0.0 --port 9100
 ```
 
-Open http://localhost:8000/ for the dashboard, http://localhost:8000/docs for OpenAPI.
+Prefer the platform daemon for the full stack — see `../platform/README.md`.
 
-### Docker
+## Ports (full platform)
 
-```bash
-docker build -t grokbot-orchestrator .
-docker run -p 8000:8000 -e ALLOW_AGENT_EXECUTION=false grokbot-orchestrator
-```
-
-## Configuration
-
-| Env | Default | Meaning |
-|-----|---------|---------|
-| `DATABASE_URL` | `sqlite:///./data/grokbot.db` | SQLite path |
-| `MAX_AGENT_DEPTH` | `3` | Max spawn depth (root=0) |
-| `ALLOW_AGENT_EXECUTION` | `false` | Gate vs call LLM |
-| `LLM_BASE_URL` | `http://localhost:11434/v1` | OpenAI-compatible API |
-| `LLM_API_KEY` | `sk-stub` | API key |
-| `LLM_MODEL` | `gpt-4o-mini` | Model id |
-| `SOURCE_DEFAULT` | `grokbot-orchestrator` | Default job source |
+| Port | Role |
+|------|------|
+| 8000 | vLLM OpenAI shim |
+| 4000 | LiteLLM |
+| 9100 | Orchestrator + HUD |
+| 9101 | Compat shim |
+| 9102 | Artifacts |
 
 ## Key endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/` | HTML dashboard |
-| `GET` | `/health` | Health + config flags |
+| `GET` | `/` | ChatBot Avrone Due'Krey HUD |
+| `GET` | `/health` | Health + ports |
+| `GET` | `/services` | Service status tiles |
+| `POST` | `/chat` | Chat completion |
+| `POST` | `/chat/stream` | SSE chat stream |
+| `POST` | `/spawn-agent` | Spawn-Agent for Tasks |
+| `GET` | `/tools` | Tool registry |
+| `GET` | `/knowledge` | Knowledge pack index |
+| `GET` | `/knowledge/{name}` | Read PROFILE / FIRST_TASK / knowledge.json |
+| `POST` | `/builds` | Queue application build job |
+| `GET/PUT` | `/config` | Custom URL, ports, flags, model routes |
+| `GET/POST` | `/artifacts` | List / upload / download |
 | `POST` | `/jobs` | Create job + root orchestrator |
-| `GET` | `/jobs/{id}` | Status + agent tree |
-| `GET` | `/jobs/{id}/agents` | Flat agent list |
-| `GET` | `/jobs/{id}/events` | Paginated events |
-| `POST` | `/jobs/{id}/append` | Mid-flight operator text |
-| `POST` | `/jobs/{id}/spawn` | Spawn sub-agent |
-| `POST` | `/jobs/{id}/cancel` | Cancel job + agents |
+| `POST` | `/jobs/{id}/spawn` | Nested spawn |
+| `POST` | `/jobs/{id}/append` | Mid-flight append |
+| `POST` | `/jobs/{id}/cancel` | Cancel |
 
-## Curl examples
-
-### Create job
+## CUSTOM_URL
 
 ```bash
-curl -s -X POST http://localhost:8000/jobs \
+curl -X PUT http://127.0.0.1:9100/config \
   -H 'Content-Type: application/json' \
-  -d '{"goal":"Design a multi-agent research pipeline","priority":2}'
+  -d '{"custom_url":"https://your.public.host"}'
 ```
 
-### Append mid-flight
+Or set `CUSTOM_URL` in `.env` / `platform/configs/avrone.env`.
 
-```bash
-JOB_ID=job_...   # from create response
-curl -s -X POST "http://localhost:8000/jobs/$JOB_ID/append" \
-  -H 'Content-Type: application/json' \
-  -d '{"text":"Prefer open-source tools only"}'
-```
+## Configuration
 
-### Spawn sub-agent
-
-```bash
-curl -s -X POST "http://localhost:8000/jobs/$JOB_ID/spawn" \
-  -H 'Content-Type: application/json' \
-  -d '{"role":"researcher","goal":"Survey orchestration patterns"}'
-```
-
-Roles: `researcher`, `coder`, `verifier` (and `orchestrator`). Optional `parent_agent_id` nests under a specific agent.
-
-### Status / events / cancel
-
-```bash
-curl -s "http://localhost:8000/jobs/$JOB_ID"
-curl -s "http://localhost:8000/jobs/$JOB_ID/events?limit=20"
-curl -s -X POST "http://localhost:8000/jobs/$JOB_ID/cancel"
-```
-
-## Model
-
-- **Job** → root **orchestrator** agent → spawnable **researcher / coder / verifier**
-- Depth limited by `MAX_AGENT_DEPTH` (default 3)
-- `MockLLMProvider` used in tests; production can point at any OpenAI-compatible endpoint
+| Env | Default | Meaning |
+|-----|---------|---------|
+| `DATABASE_URL` | `sqlite:///./data/avrone.db` | SQLite path |
+| `MAX_AGENT_DEPTH` | `3` | Max spawn depth |
+| `ALLOW_AGENT_EXECUTION` | `false` | Gate vs call LLM |
+| `LLM_BASE_URL` | `http://127.0.0.1:4000/v1` | LiteLLM |
+| `LLM_MODEL` | `mock-gpt` | Model id |
+| `CUSTOM_URL` | _(empty)_ | Public base URL for HUD |
+| `KNOWLEDGE_ROOT` | repo root | Where knowledge.json lives |
 
 ## License
 

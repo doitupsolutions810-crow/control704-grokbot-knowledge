@@ -71,10 +71,29 @@ CREATE TABLE IF NOT EXISTS agents (
     depth INTEGER NOT NULL DEFAULT 0,
     activation_intent TEXT,
     result TEXT,
+    tools TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     FOREIGN KEY (job_id) REFERENCES jobs(id),
     FOREIGN KEY (parent_agent_id) REFERENCES agents(id)
+);
+
+CREATE TABLE IF NOT EXISTS builds (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    target TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'queued',
+    spec TEXT NOT NULL DEFAULT '{}',
+    job_id TEXT,
+    result TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS runtime_config (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS events (
@@ -96,6 +115,9 @@ CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at);
 def init_db() -> None:
     with db_session() as conn:
         conn.executescript(SCHEMA)
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(agents)").fetchall()}
+        if "tools" not in cols:
+            conn.execute("ALTER TABLE agents ADD COLUMN tools TEXT")
 
 
 def reset_db() -> None:
@@ -167,16 +189,20 @@ def _row_to_job(row: sqlite3.Row) -> Job:
 
 def insert_agent(agent: Agent) -> Agent:
     with db_session() as conn:
+        # migrate older DBs that lack tools column
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(agents)").fetchall()}
+        if "tools" not in cols:
+            conn.execute("ALTER TABLE agents ADD COLUMN tools TEXT")
         conn.execute(
             """
             INSERT INTO agents (id, job_id, role, goal, status, parent_agent_id, depth,
-                                activation_intent, result, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                activation_intent, result, tools, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 agent.id, agent.job_id, agent.role, agent.goal, agent.status,
                 agent.parent_agent_id, agent.depth, agent.activation_intent,
-                agent.result, agent.created_at, agent.updated_at,
+                agent.result, agent.tools, agent.created_at, agent.updated_at,
             ),
         )
     return agent
@@ -208,6 +234,7 @@ def list_agents_for_job(job_id: str) -> list[Agent]:
 
 
 def _row_to_agent(row: sqlite3.Row) -> Agent:
+    keys = row.keys()
     return Agent(
         id=row["id"],
         job_id=row["job_id"],
@@ -218,9 +245,103 @@ def _row_to_agent(row: sqlite3.Row) -> Agent:
         depth=row["depth"],
         activation_intent=row["activation_intent"],
         result=row["result"],
+        tools=row["tools"] if "tools" in keys else None,
         created_at=row["created_at"],
         updated_at=row["updated_at"],
     )
+
+
+# --- Builds ---
+
+def insert_build(build_id: str, name: str, target: str, spec: dict, job_id: Optional[str] = None) -> dict:
+    now = utcnow()
+    payload = json.dumps(spec or {})
+    with db_session() as conn:
+        conn.execute(
+            """
+            INSERT INTO builds (id, name, target, status, spec, job_id, result, created_at, updated_at)
+            VALUES (?, ?, ?, 'queued', ?, ?, NULL, ?, ?)
+            """,
+            (build_id, name, target, payload, job_id, now, now),
+        )
+    return get_build(build_id)
+
+
+def get_build(build_id: str) -> Optional[dict]:
+    with db_session() as conn:
+        row = conn.execute("SELECT * FROM builds WHERE id = ?", (build_id,)).fetchone()
+    if not row:
+        return None
+    return {
+        "id": row["id"],
+        "name": row["name"],
+        "target": row["target"],
+        "status": row["status"],
+        "spec": json.loads(row["spec"] or "{}"),
+        "job_id": row["job_id"],
+        "result": row["result"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
+
+
+def update_build(build_id: str, **fields: Any) -> Optional[dict]:
+    if not fields:
+        return get_build(build_id)
+    fields["updated_at"] = utcnow()
+    if "spec" in fields and isinstance(fields["spec"], dict):
+        fields["spec"] = json.dumps(fields["spec"])
+    cols = ", ".join(f"{k} = ?" for k in fields)
+    vals = list(fields.values()) + [build_id]
+    with db_session() as conn:
+        conn.execute(f"UPDATE builds SET {cols} WHERE id = ?", vals)
+    return get_build(build_id)
+
+
+def list_builds(limit: int = 50) -> list[dict]:
+    with db_session() as conn:
+        rows = conn.execute(
+            "SELECT * FROM builds ORDER BY created_at DESC LIMIT ?", (limit,)
+        ).fetchall()
+    out = []
+    for row in rows:
+        out.append({
+            "id": row["id"],
+            "name": row["name"],
+            "target": row["target"],
+            "status": row["status"],
+            "spec": json.loads(row["spec"] or "{}"),
+            "job_id": row["job_id"],
+            "result": row["result"],
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+        })
+    return out
+
+
+def set_runtime_config(key: str, value: str) -> None:
+    with db_session() as conn:
+        conn.execute(
+            """
+            INSERT INTO runtime_config (key, value, updated_at) VALUES (?, ?, ?)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+            """,
+            (key, value, utcnow()),
+        )
+
+
+def get_runtime_config(key: str) -> Optional[str]:
+    with db_session() as conn:
+        row = conn.execute(
+            "SELECT value FROM runtime_config WHERE key = ?", (key,)
+        ).fetchone()
+    return row["value"] if row else None
+
+
+def list_runtime_config() -> dict[str, str]:
+    with db_session() as conn:
+        rows = conn.execute("SELECT key, value FROM runtime_config").fetchall()
+    return {r["key"]: r["value"] for r in rows}
 
 
 # --- Event CRUD ---

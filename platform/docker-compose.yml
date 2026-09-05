@@ -1,0 +1,50 @@
+# ChatBot Avrone Due'Krey — docker compose (LiteLLM + orchestrator + artifacts volume)
+services:
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    ports:
+      - "${LITELLM_PORT:-4000}:4000"
+    volumes:
+      - ./configs/litellm_config.yaml:/app/config.yaml:ro
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_API_BASE=${OPENAI_API_BASE:-}
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--host", "0.0.0.0"]
+    restart: unless-stopped
+
+  orchestrator:
+    build:
+      context: ../orchestrator
+    ports:
+      - "${ORCHESTRATOR_PORT:-9100}:9100"
+    environment:
+      - ALLOW_AGENT_EXECUTION=${ALLOW_AGENT_EXECUTION:-false}
+      - LLM_BASE_URL=http://litellm:4000/v1
+      - LLM_API_KEY=${LLM_API_KEY:-sk-avrone}
+      - LLM_MODEL=${LLM_MODEL:-mock-gpt}
+      - PORT=9100
+      - DATABASE_URL=sqlite:///./data/avrone.db
+      - CUSTOM_URL=${CUSTOM_URL:-}
+    volumes:
+      - avrone-artifacts:/app/data/artifacts
+      - ../knowledge.json:/knowledge/knowledge.json:ro
+      - ../PROFILE.md:/knowledge/PROFILE.md:ro
+      - ../FIRST_TASK.md:/knowledge/FIRST_TASK.md:ro
+    depends_on:
+      - litellm
+    restart: unless-stopped
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "9100"]
+
+  artifacts:
+    image: python:3.11-slim
+    working_dir: /srv
+    ports:
+      - "${ARTIFACT_PORT:-9102}:9102"
+    volumes:
+      - avrone-artifacts:/srv/artifacts
+      - ./artifact_server.py:/srv/artifact_server.py:ro
+    command: ["bash", "-lc", "pip install -q fastapi uvicorn && python artifact_server.py --host 0.0.0.0 --port 9102 --root /srv/artifacts"]
+    restart: unless-stopped
+
+volumes:
+  avrone-artifacts:

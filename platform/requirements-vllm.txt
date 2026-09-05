@@ -1,0 +1,2 @@
+# Optional — only install when nvidia-smi works
+vllm>=0.5.0

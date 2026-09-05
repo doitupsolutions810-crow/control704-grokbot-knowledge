@@ -51,7 +51,7 @@ class Job:
     status: str = JobStatus.pending.value
     priority: int = 0
     tenant_id: Optional[str] = None
-    source: str = "grokbot-orchestrator"
+    source: str = "avrone-duekrey"
     policy: Optional[str] = None
     created_at: str = field(default_factory=utcnow)
     updated_at: str = field(default_factory=utcnow)
@@ -83,8 +83,18 @@ class Agent:
     depth: int = 0
     activation_intent: Optional[str] = None
     result: Optional[str] = None
+    tools: Optional[str] = None  # JSON list string
     created_at: str = field(default_factory=utcnow)
     updated_at: str = field(default_factory=utcnow)
+
+    def tools_list(self) -> list[str]:
+        if not self.tools:
+            return []
+        try:
+            data = json.loads(self.tools)
+            return data if isinstance(data, list) else []
+        except json.JSONDecodeError:
+            return []
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -97,6 +107,7 @@ class Agent:
             "depth": self.depth,
             "activation_intent": self.activation_intent,
             "result": self.result,
+            "tools": self.tools_list(),
             "created_at": self.created_at,
             "updated_at": self.updated_at,
         }

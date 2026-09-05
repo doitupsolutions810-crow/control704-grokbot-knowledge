@@ -238,7 +238,10 @@ async def spawn_subagent(
     role: str,
     goal: str,
     parent_agent_id: Optional[str] = None,
+    tools: Optional[list[str]] = None,
 ) -> dict[str, Any]:
+    import json as _json
+
     settings = get_settings()
     job = db.get_job(job_id)
     if not job:
@@ -259,6 +262,7 @@ async def spawn_subagent(
             f"Max agent depth exceeded: {depth} > MAX_AGENT_DEPTH={settings.max_agent_depth}"
         )
 
+    tools = tools or []
     agent = Agent(
         id=new_id("agt_"),
         job_id=job_id,
@@ -267,12 +271,19 @@ async def spawn_subagent(
         status=AgentStatus.pending.value,
         parent_agent_id=parent_id,
         depth=depth,
+        tools=_json.dumps(tools) if tools else None,
     )
     db.insert_agent(agent)
     db.insert_event(
         job_id,
         "agent.spawned",
-        {"role": role, "goal": goal, "depth": depth, "parent_agent_id": parent_id},
+        {
+            "role": role,
+            "goal": goal,
+            "depth": depth,
+            "parent_agent_id": parent_id,
+            "tools": tools,
+        },
         agent_id=agent.id,
     )
 
@@ -283,7 +294,68 @@ async def spawn_subagent(
         "gated": activation["gated"],
         "activation_intent": activation.get("activation_intent"),
         "message": activation.get("message", "Spawned"),
+        "tools": tools,
     }
+
+
+async def spawn_agent_for_task(
+    role: str,
+    goal: str,
+    tools: Optional[list[str]] = None,
+    job_id: Optional[str] = None,
+    parent_agent_id: Optional[str] = None,
+    priority: int = 0,
+    source: Optional[str] = "spawn-agent",
+) -> dict[str, Any]:
+    """Spawn-Agent for Tasks: create job if missing, then spawn."""
+    tools = tools or []
+    if not job_id:
+        created = await create_job(
+            goal=goal,
+            priority=priority,
+            source=source or "spawn-agent",
+        )
+        job_id = created["job"].id
+        # If spawning non-orchestrator role as the task agent, spawn under root
+        if role != AgentRole.orchestrator.value:
+            result = await spawn_subagent(
+                job_id=job_id,
+                role=role,
+                goal=goal,
+                parent_agent_id=created["job"].root_agent_id,
+                tools=tools,
+            )
+            return {
+                **result,
+                "job_id": job_id,
+                "job": created["job"],
+            }
+        # Root is already orchestrator — attach tools metadata via event
+        db.insert_event(
+            job_id,
+            "spawn-agent.task",
+            {"role": role, "goal": goal, "tools": tools},
+            agent_id=created["job"].root_agent_id,
+        )
+        root = db.get_agent(created["job"].root_agent_id)
+        return {
+            "agent": root,
+            "gated": created["activation"]["gated"],
+            "activation_intent": created["activation"].get("activation_intent"),
+            "message": created["activation"].get("message", "Spawned"),
+            "tools": tools,
+            "job_id": job_id,
+            "job": created["job"],
+        }
+
+    result = await spawn_subagent(
+        job_id=job_id,
+        role=role,
+        goal=goal,
+        parent_agent_id=parent_agent_id,
+        tools=tools,
+    )
+    return {**result, "job_id": job_id}
 
 
 def cancel_job(job_id: str) -> dict[str, Any]:
