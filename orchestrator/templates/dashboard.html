@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GrokBot Orchestrator</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a2332;
+      --border: #2d3a4f;
+      --text: #e7ecf3;
+      --muted: #8b9bb4;
+      --accent: #3b82f6;
+      --ok: #22c55e;
+      --warn: #f59e0b;
+      --bad: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: ui-sans-serif, system-ui, sans-serif;
+      background: var(--bg); color: var(--text); line-height: 1.5;
+    }
+    header {
+      padding: 1.25rem 2rem; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--panel);
+    }
+    h1 { margin: 0; font-size: 1.25rem; letter-spacing: 0.02em; }
+    .meta { color: var(--muted); font-size: 0.875rem; }
+    main { padding: 1.5rem 2rem; max-width: 1100px; margin: 0 auto; }
+    .card {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 1rem;
+    }
+    .job-title { font-weight: 600; margin-bottom: 0.35rem; }
+    .badge {
+      display: inline-block; padding: 0.15rem 0.5rem; border-radius: 999px;
+      font-size: 0.75rem; font-weight: 600; background: #243044; color: var(--muted);
+    }
+    .badge.running, .badge.activating { color: var(--accent); background: #1e3a5f; }
+    .badge.gated { color: var(--warn); background: #3d2e12; }
+    .badge.completed { color: var(--ok); background: #14301f; }
+    .badge.cancelled, .badge.failed { color: var(--bad); background: #3b1515; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; margin-top: 0.75rem; }
+    th, td { text-align: left; padding: 0.4rem 0.5rem; border-top: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 500; }
+    .empty { color: var(--muted); padding: 2rem; text-align: center; }
+    code { font-size: 0.8rem; color: #93c5fd; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>GrokBot Orchestrator</h1>
+    <div class="meta">
+      ALLOW_AGENT_EXECUTION=<strong>{{ "true" if allow_exec else "false" }}</strong>
+      · MAX_AGENT_DEPTH={{ max_depth }}
+    </div>
+  </header>
+  <main>
+    <p class="meta">Jobs and agent trees. Refresh to update. API at <code>/jobs</code>, <code>/health</code>.</p>
+    {% if not job_rows %}
+      <div class="card empty">No jobs yet. POST /jobs to create one.</div>
+    {% endif %}
+    {% for row in job_rows %}
+      <div class="card">
+        <div class="job-title">
+          <code>{{ row.job.id }}</code>
+          <span class="badge {{ row.job.status }}">{{ row.job.status }}</span>
+          · {{ row.agent_count }} agent{{ "" if row.agent_count == 1 else "s" }}
+        </div>
+        <div>{{ row.job.goal }}</div>
+        <div class="meta">source={{ row.job.source }} · priority={{ row.job.priority }} · {{ row.job.created_at }}</div>
+        {% if row.agents %}
+        <table>
+          <thead>
+            <tr><th>Agent</th><th>Role</th><th>Depth</th><th>Status</th><th>Goal</th></tr>
+          </thead>
+          <tbody>
+            {% for a in row.agents %}
+            <tr>
+              <td><code>{{ a.id }}</code></td>
+              <td>{{ a.role }}</td>
+              <td>{{ a.depth }}</td>
+              <td><span class="badge {{ a.status }}">{{ a.status }}</span></td>
+              <td>{{ a.goal[:80] }}{% if a.goal|length > 80 %}…{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </main>
+</body>
+</html>
